@@ -16,3 +16,16 @@ ui <- fluidPage(
   # Your UI components with LaTeX equations
   # ...
 )
+
+ui <- fluidPage(
+  mainPanel(
+    textOutput("equation")
+  )
+)
+
+
+server <- function(input, output) {
+  output$equation <- renderText({
+    "$$UCL = \\bar{C} + Z \\cdot \\sqrt{\\bar{C}}$$"
+  })
+}
