@@ -1,6 +1,11 @@
 library(shiny)
 library(readxl)
 library(qicharts2)
+library(shiny)
+library(readxl)
+library(qicharts2)
+library(ggplot2)
+library(DT)
 
 ui <- fluidPage(
   titlePanel("Quality Control Charts"),
@@ -24,12 +29,15 @@ ui <- fluidPage(
     ),
     
     mainPanel(
-      plotOutput("chart")
+      plotOutput("chart"),
+      dataTableOutput("table")
     )
   )
 )
 
 server <- function(input, output, session) {
+  data <- reactiveValues(chart = NULL, table = NULL)
+  
   observeEvent(input$file, {
     file <- input$file
     if (!is.null(file)) {
@@ -40,13 +48,7 @@ server <- function(input, output, session) {
     }
   })
   
-  output$chart <- renderPlot({
-    req(input$createChartBtn)
-    
-    if (input$createChartBtn == 0) {
-      return()  # Return an empty plot if the button hasn't been clicked yet
-    }
-    
+  observeEvent(input$createChartBtn, {
     req(input$file, input$countColumn, input$dateColumn)
     
     df <- read_excel(input$file$datapath)
@@ -54,14 +56,35 @@ server <- function(input, output, session) {
     x <- df[[input$dateColumn]]
     
     if (input$chartType == "C Chart") {
-      chart <- qic(y, x, chart = "C", title = input$countColumn)
+      chart <- qic(y, x, chart = "C", title = input$countColumn, empty = TRUE)
     } else if (input$chartType == "U Chart") {
       req(input$sampleSizeColumn)
       n <- df[[input$sampleSizeColumn]]
-      chart <- qic(y, x, n, chart = "U", title = input$countColumn)
+      chart <- qic(y, x, n, chart = "U", title = input$countColumn, empty = TRUE)
     }
     
-    plot(chart, empty = TRUE)  # Generate an empty plot
+    data$chart <- chart
+    
+    # Generate datatable
+    data$table <- data.frame(x = x, y = y, UCL = chart$limits$UCL, stringsAsFactors = FALSE)
+    data$table$above_UCL <- data$table$y > data$table$UCL
+    
+    output$chart <- renderPlot({
+      if (is.null(data$chart))
+        return()
+      
+      plot(data$chart, empty = TRUE)
+    })
+    
+    output$table <- renderDataTable({
+      datatable(data$table, options = list(pageLength = 10), rownames = FALSE) %>%
+        formatStyle(
+          "y",
+          backgroundColor = styleInterval(data$table$y, c(0, data$table$UCL)),
+          color = "white",
+          background = c("transparent", "red")
+        )
+    })
   })
 }
 
