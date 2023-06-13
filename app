@@ -1,81 +1,68 @@
 library(shiny)
-library(ggplot2)
-library(dplyr)
-library(DT)
+library(readxl)
+library(qicharts2)
 
-# UI definition
 ui <- fluidPage(
-  titlePanel("U and C Chart Generator"),
+  titlePanel("Quality Control Charts"),
+  
   sidebarLayout(
     sidebarPanel(
-      fileInput("dataFile", "Upload CSV file"),
-      radioButtons("chartType", "Chart Type",
-                   choices = c("C Chart", "U Chart"),
-                   selected = "C Chart")
+      fileInput("file", "Upload Excel File", accept = c(".xlsx")),
+      radioButtons("chartType", "Select Chart Type:", choices = c("C Chart", "U Chart")),
+      conditionalPanel(
+        condition = "input.chartType == 'C Chart'",
+        selectInput("countColumn", "Select Count Column:", NULL),
+        selectInput("dateColumn", "Select Date Column:", NULL)
+      ),
+      conditionalPanel(
+        condition = "input.chartType == 'U Chart'",
+        selectInput("countColumn", "Select Count Column:", NULL),
+        selectInput("sampleSizeColumn", "Select Sample Size Column:", NULL),
+        selectInput("dateColumn", "Select Date Column:", NULL)
+      ),
+      actionButton("createChartBtn", "Create Chart")
     ),
+    
     mainPanel(
-      plotOutput("chart"),
-      dataTableOutput("controlTable")
+      plotOutput("chart")
     )
   )
 )
 
-# Server logic
-server <- function(input, output) {
-  # Read data from uploaded file
-  data <- reactive({
-    req(input$dataFile)
-    read.csv(input$dataFile$datapath)
-  })
-  
-  # Generate C Chart
-  cChart <- reactive({
-    data() %>%
-      ggplot(aes(x = date, y = count_defects / count_total_defects)) +
-      geom_line() +
-      geom_hline(yintercept = mean(.$count_defects / .$count_total_defects),
-                 color = "red", linetype = "dashed") +
-      labs(x = "Date", y = "C Chart", title = "C Chart")
-  })
-  
-  # Generate U Chart
-  uChart <- reactive({
-    data() %>%
-      ggplot(aes(x = date, y = rate)) +
-      geom_line() +
-      geom_hline(yintercept = mean(.$rate),
-                 color = "red", linetype = "dashed") +
-      labs(x = "Date", y = "U Chart", title = "U Chart")
-  })
-  
-  # Calculate control limits
-  controlLimits <- reactive({
-    c_avg <- mean(data()$count_defects)
-    n_total <- sum(data()$count_total_defects)
-    k <- length(unique(data()$date))
-    m <- c_avg
-    u_hat <- sum(data()$count_defects) / n_total
-    
-    lower_limit <- u_hat - 3 * sqrt(u_hat / n_total)
-    upper_limit <- u_hat + 3 * sqrt(u_hat / n_total)
-    
-    data.frame(Lower_Limit = lower_limit, Upper_Limit = upper_limit)
-  })
-  
-  # Render the selected chart
-  output$chart <- renderPlot({
-    if (input$chartType == "C Chart") {
-      print(cChart())
-    } else {
-      print(uChart())
+server <- function(input, output, session) {
+  observeEvent(input$file, {
+    file <- input$file
+    if (!is.null(file)) {
+      df <- read_excel(file$datapath)
+      updateSelectInput(session, "countColumn", choices = colnames(df))
+      updateSelectInput(session, "dateColumn", choices = colnames(df))
+      updateSelectInput(session, "sampleSizeColumn", choices = colnames(df))
     }
   })
   
-  # Render the control limits table
-  output$controlTable <- renderDataTable({
-    controlLimits()
+  output$chart <- renderPlot({
+    req(input$createChartBtn)
+    
+    if (input$createChartBtn == 0) {
+      return()  # Return an empty plot if the button hasn't been clicked yet
+    }
+    
+    req(input$file, input$countColumn, input$dateColumn)
+    
+    df <- read_excel(input$file$datapath)
+    y <- df[[input$countColumn]]
+    x <- df[[input$dateColumn]]
+    
+    if (input$chartType == "C Chart") {
+      chart <- qic(y, x, chart = "C", title = input$countColumn)
+    } else if (input$chartType == "U Chart") {
+      req(input$sampleSizeColumn)
+      n <- df[[input$sampleSizeColumn]]
+      chart <- qic(y, x, n, chart = "U", title = input$countColumn)
+    }
+    
+    plot(chart, empty = TRUE)  # Generate an empty plot
   })
 }
 
-# Run the Shiny app
 shinyApp(ui, server)
