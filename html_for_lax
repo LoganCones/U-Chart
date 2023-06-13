@@ -1,0 +1,18 @@
+ui <- fluidPage(
+  tags$head(
+    tags$script(src = "https://polyfill.io/v3/polyfill.min.js?features=es6"),
+    tags$script(src = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"),
+    tags$script(
+      "MathJax.Hub.Config({
+        tex2jax: {inlineMath: [['\\(', '\\)']]},
+        displayMath: [['$$', '$$']],
+        CommonHTML: {matchFontHeight: false},
+        'HTML-CSS': {linebreaks: {automatic: true}}
+      });
+      MathJax.Hub.Queue(['Typeset', MathJax.Hub]);"
+    )
+  ),
+  
+  # Your UI components with LaTeX equations
+  # ...
+)
