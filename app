@@ -1,9 +1,6 @@
 library(shiny)
 library(readxl)
 library(qicharts2)
-library(shiny)
-library(readxl)
-library(qicharts2)
 library(ggplot2)
 library(DT)
 
