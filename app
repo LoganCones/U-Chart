@@ -72,8 +72,10 @@ server <- function(input, output, session) {
     data$chart <- chart
     
     # Generate datatable
-    data$table <- data.frame(x = x, y = y, UCL = chart$limits$UCL, stringsAsFactors = FALSE)
-    data$table$above_UCL <- data$table$y > data$table$UCL
+    if (!is.null(chart)) {
+      data$table <- data.frame(x = x, y = y, UCL = chart$limits$UCL, stringsAsFactors = FALSE)
+      data$table$above_UCL <- data$table$y > data$table$UCL
+    }
     
     output$chart <- renderPlot({
       if (is.null(data$chart))
@@ -83,13 +85,15 @@ server <- function(input, output, session) {
     })
     
     output$table <- renderDataTable({
-      datatable(data$table, options = list(pageLength = 10), rownames = FALSE) %>%
-        formatStyle(
-          "y",
-          backgroundColor = styleInterval(data$table$y, c(0, data$table$UCL)),
-          color = "white",
-          background = ifelse(data$table$y > data$table$UCL, "red", "transparent")
-        )
+      if (!is.null(data$table)) {
+        datatable(data$table, options = list(pageLength = 10), rownames = FALSE) %>%
+          formatStyle(
+            "y",
+            backgroundColor = styleInterval(data$table$y, c(0, data$table$UCL)),
+            color = "white",
+            background = ifelse(data$table$y > data$table$UCL, "red", "transparent")
+          )
+      }
     })
   })
 }
