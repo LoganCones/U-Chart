@@ -13,14 +13,14 @@ ui <- fluidPage(
       radioButtons("chartType", "Select Chart Type:", choices = c("C Chart", "U Chart")),
       conditionalPanel(
         condition = "input.chartType == 'C Chart'",
-        selectInput("countColumn", "Select Count Column:", NULL),
-        selectInput("dateColumn", "Select Date Column:", NULL)
+        selectInput("cCountColumn", "Select Count Column:", NULL),
+        selectInput("cDateColumn", "Select Date Column:", NULL)
       ),
       conditionalPanel(
         condition = "input.chartType == 'U Chart'",
-        selectInput("countColumn", "Select Count Column:", NULL),
-        selectInput("sampleSizeColumn", "Select Sample Size Column:", NULL),
-        selectInput("dateColumn", "Select Date Column:", NULL)
+        selectInput("uCountColumn", "Select Count Column:", NULL),
+        selectInput("uSampleSizeColumn", "Select Sample Size Column:", NULL),
+        selectInput("uDateColumn", "Select Date Column:", NULL)
       ),
       actionButton("createChartBtn", "Create Chart")
     ),
@@ -39,25 +39,34 @@ server <- function(input, output, session) {
     file <- input$file
     if (!is.null(file)) {
       df <- read_excel(file$datapath)
-      updateSelectInput(session, "countColumn", choices = colnames(df))
-      updateSelectInput(session, "dateColumn", choices = colnames(df))
-      updateSelectInput(session, "sampleSizeColumn", choices = colnames(df))
+      updateSelectInput(session, "cCountColumn", choices = colnames(df))
+      updateSelectInput(session, "cDateColumn", choices = colnames(df))
+      updateSelectInput(session, "uCountColumn", choices = colnames(df))
+      updateSelectInput(session, "uSampleSizeColumn", choices = colnames(df))
+      updateSelectInput(session, "uDateColumn", choices = colnames(df))
     }
   })
   
   observeEvent(input$createChartBtn, {
-    req(input$file, input$countColumn, input$dateColumn)
+    req(input$file)
     
     df <- read_excel(input$file$datapath)
-    y <- df[[input$countColumn]]
-    x <- df[[input$dateColumn]]
     
     if (input$chartType == "C Chart") {
-      chart <- qic(y, x, chart = "C", title = input$countColumn, empty = TRUE)
+      req(input$cCountColumn, input$cDateColumn)
+      
+      y <- df[[input$cCountColumn]]
+      x <- df[[input$cDateColumn]]
+      
+      chart <- qic(y, x, chart = "C", main = input$cCountColumn, empty = TRUE)
     } else if (input$chartType == "U Chart") {
-      req(input$sampleSizeColumn)
-      n <- df[[input$sampleSizeColumn]]
-      chart <- qic(y, x, n, chart = "U", title = input$countColumn, empty = TRUE)
+      req(input$uCountColumn, input$uSampleSizeColumn, input$uDateColumn)
+      
+      y <- df[[input$uCountColumn]]
+      n <- df[[input$uSampleSizeColumn]]
+      x <- df[[input$uDateColumn]]
+      
+      chart <- qic(y, x, n, chart = "U", main = input$uCountColumn, empty = TRUE)
     }
     
     data$chart <- chart
@@ -79,7 +88,7 @@ server <- function(input, output, session) {
           "y",
           backgroundColor = styleInterval(data$table$y, c(0, data$table$UCL)),
           color = "white",
-          background = c("transparent", "red")
+          background = ifelse(data$table$y > data$table$UCL, "red", "transparent")
         )
     })
   })
