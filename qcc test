@@ -1,0 +1,69 @@
+library(shiny)
+library(qcc)
+
+# Define the UI
+ui <- fluidPage(
+  titlePanel("Quality Control Chart Generator"),
+  sidebarLayout(
+    sidebarPanel(
+      fileInput("file", "Upload Excel file"),
+      radioButtons("chartType", "Select chart type:",
+                   choices = c("U Chart", "C Chart"),
+                   selected = "U Chart"),
+      conditionalPanel(
+        condition = "input.chartType == 'C Chart'",
+        selectInput("countCol", "Select column for y count vector:",
+                    choices = NULL),
+        selectInput("dateCol", "Select column for date field:",
+                    choices = NULL)
+      ),
+      conditionalPanel(
+        condition = "input.chartType == 'U Chart'",
+        selectInput("countCol", "Select column for y count vector:",
+                    choices = NULL),
+        numericInput("sampleSize", "Enter sample size (n):", value = 1),
+        selectInput("dateCol", "Select column for date field:",
+                    choices = NULL)
+      ),
+      actionButton("generateChart", "Generate Chart")
+    ),
+    mainPanel(
+      plotOutput("chart")
+    )
+  )
+)
+
+# Define the server
+server <- function(input, output) {
+  data <- reactive({
+    req(input$file)
+    read.xlsx(input$file$datapath, 1)
+  })
+  
+  observe({
+    updateSelectInput(session, "countCol", 
+                      choices = colnames(data()))
+    updateSelectInput(session, "dateCol",
+                      choices = colnames(data()))
+  })
+  
+  observeEvent(input$generateChart, {
+    req(input$countCol, input$dateCol)
+    
+    if (input$chartType == "C Chart") {
+      chart_data <- data()[, c(input$dateCol, input$countCol)]
+      qcc_obj <- qic(chart_data[, 2], chart_data[, 1], chart = "C")
+    } else {
+      chart_data <- data()[, c(input$dateCol, input$countCol)]
+      qcc_obj <- qic(chart_data[, 2], chart_data[, 1], chart = "u",
+                     sizes = input$sampleSize)
+    }
+    
+    output$chart <- renderPlot({
+      plot(qcc_obj)
+    })
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
