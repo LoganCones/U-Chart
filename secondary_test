@@ -1,28 +1,18 @@
 library(shiny)
 library(ggplot2)
 library(dplyr)
-
-# Define example data
-set.seed(123)
-start_date <- as.Date("2021-01-01")
-end_date <- as.Date("2022-12-31")
-dates <- seq(start_date, end_date, by = "month")
-rate <- rnorm(length(dates), mean = 10, sd = 2)
-df <- data.frame(Date = dates, Rate = rate)
-
-# Calculate mean, standard deviation, and linear regression
-mean_rate <- mean(df$Rate)
-sd_rate <- sd(df$Rate)
-lm_fit <- lm(Rate ~ Date, data = df)
-
-# Calculate upper control limit for U Chart
-ucl <- qnorm(0.997) * sqrt(mean_rate)
+library(readxl)
+library(lubridate)
 
 # Define UI
 ui <- fluidPage(
   titlePanel("Time Series Visualization"),
   sidebarLayout(
-    sidebarPanel(),
+    sidebarPanel(
+      fileInput("file", "Upload Dataset"),
+      selectInput("column", "Select a Column", choices = NULL),
+      selectInput("value", "Select a Value", choices = NULL)
+    ),
     mainPanel(
       plotOutput("time_series_plot")
     )
@@ -30,9 +20,41 @@ ui <- fluidPage(
 )
 
 # Define server logic
-server <- function(input, output) {
+server <- function(input, output, session) {
+  
+  dataset <- reactive({
+    req(input$file)
+    df <- read_excel(input$file$datapath)
+    
+    # Convert columns containing dates to the 'Date' format
+    date_columns <- sapply(df, function(x) is.Date(parse_date_time(x, orders = "mdy")))
+    df[date_columns] <- lapply(df[date_columns], function(x) parse_date_time(x, orders = "mdy"))
+    
+    df
+  })
+  
+  observeEvent(dataset(), {
+    updateSelectInput(session, "column", choices = colnames(dataset()))
+  })
+  
+  observeEvent(input$column, {
+    updateSelectInput(session, "value", choices = unique(dataset()[[input$column]]))
+  })
+  
   output$time_series_plot <- renderPlot({
-    ggplot(df, aes(x = Date, y = Rate)) +
+    req(input$column, input$value)
+    
+    # Use the selected column and value for further data processing or plotting
+    # For example:
+    df <- dataset()
+    selected_df <- df[df[[input$column]] == input$value, ]
+    
+    mean_rate <- mean(selected_df$Rate)
+    sd_rate <- sd(selected_df$Rate)
+    lm_fit <- lm(Rate ~ Date, data = selected_df)
+    ucl <- qnorm(0.997) * sqrt(mean_rate)
+    
+    ggplot(selected_df, aes(x = Date, y = Rate)) +
       geom_line() +
       geom_smooth(method = "lm", se = FALSE, color = "gray", linetype = "dotted") +
       geom_line(aes(y = mean_rate), color = "gray", linetype = "dotted") +
