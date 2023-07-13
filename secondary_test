@@ -1,0 +1,51 @@
+library(shiny)
+library(ggplot2)
+library(dplyr)
+
+# Define example data
+set.seed(123)
+start_date <- as.Date("2021-01-01")
+end_date <- as.Date("2022-12-31")
+dates <- seq(start_date, end_date, by = "month")
+rate <- rnorm(length(dates), mean = 10, sd = 2)
+df <- data.frame(Date = dates, Rate = rate)
+
+# Calculate mean, standard deviation, and linear regression
+mean_rate <- mean(df$Rate)
+sd_rate <- sd(df$Rate)
+lm_fit <- lm(Rate ~ Date, data = df)
+
+# Calculate upper control limit for U Chart
+ucl <- qnorm(0.997) * sqrt(mean_rate)
+
+# Define UI
+ui <- fluidPage(
+  titlePanel("Time Series Visualization"),
+  sidebarLayout(
+    sidebarPanel(),
+    mainPanel(
+      plotOutput("time_series_plot")
+    )
+  )
+)
+
+# Define server logic
+server <- function(input, output) {
+  output$time_series_plot <- renderPlot({
+    ggplot(df, aes(x = Date, y = Rate)) +
+      geom_line() +
+      geom_smooth(method = "lm", se = FALSE, color = "gray", linetype = "dotted") +
+      geom_line(aes(y = mean_rate), color = "gray", linetype = "dotted") +
+      geom_line(aes(y = mean_rate + sd_rate), color = "lightblue", linetype = "dotted") +
+      geom_line(aes(y = mean_rate - sd_rate), color = "lightblue", linetype = "dotted") +
+      geom_line(aes(y = mean_rate + 2 * sd_rate), color = "lightblue", linetype = "dotted") +
+      geom_line(aes(y = mean_rate - 2 * sd_rate), color = "lightblue", linetype = "dotted") +
+      geom_line(aes(y = mean_rate + 3 * sd_rate), color = "lightblue", linetype = "dotted") +
+      geom_line(aes(y = mean_rate - 3 * sd_rate), color = "lightblue", linetype = "dotted") +
+      geom_line(aes(y = ucl), color = "green", linetype = "solid") +
+      labs(x = "Date", y = "Rate", title = "Time Series Visualization")
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
